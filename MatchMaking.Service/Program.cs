@@ -15,7 +15,8 @@ public class Program
 
         builder.Services.AddApplication();
         builder.Services.AddInfrastructure(builder.Configuration);
-        builder.Services.AddServiceKafkaConsumer(builder.Configuration);
+        if (!builder.Environment.IsEnvironment("Testing"))
+            builder.Services.AddServiceKafkaConsumer(builder.Configuration);
 
         builder.Services.AddControllers();
         builder.Services.AddOpenApi();
