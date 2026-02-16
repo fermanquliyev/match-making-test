@@ -75,6 +75,13 @@ jobs:
             sleep 2
           done
 
+      - name: Create Kafka topics
+        run: |
+          docker run --rm --network host confluentinc/cp-kafka:7.6.0 kafka-topics --create --if-not-exists \
+            --topic matchmaking.complete --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+          docker run --rm --network host confluentinc/cp-kafka:7.6.0 kafka-topics --create --if-not-exists \
+            --topic matchmaking.request --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+
       - name: Run Integration Tests
         run: dotnet test MatchMaking.IntegrationTests/MatchMaking.IntegrationTests.csproj -c Release --no-build --verbosity normal
         env:
