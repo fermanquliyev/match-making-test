@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <WarningsAsErrors>nullable</WarningsAsErrors>
+    <UserSecretsId>matchmaking-worker</UserSecretsId>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    <RootNamespace>MatchMaking.Worker</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MatchMaking.Application\MatchMaking.Application.csproj" />
+    <ProjectReference Include="..\MatchMaking.Infrastructure\MatchMaking.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

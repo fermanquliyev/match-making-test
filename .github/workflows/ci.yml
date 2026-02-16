@@ -1,0 +1,101 @@
+# CI – Build, Test, Code Coverage (every PR and push to main)
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+      zookeeper:
+        image: confluentinc/cp-zookeeper:7.6.0
+        ports:
+          - 2181:2181
+        env:
+          ZOOKEEPER_CLIENT_PORT: 2181
+          ZOOKEEPER_TICK_TIME: 2000
+
+      kafka:
+        image: confluentinc/cp-kafka:7.6.0
+        ports:
+          - 9092:9092
+        env:
+          KAFKA_BROKER_ID: 1
+          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+          KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Restore
+        run: dotnet restore MatchMaking.slnx
+
+      - name: Build
+        run: dotnet build MatchMaking.slnx --no-restore -c Release
+
+      - name: Run Unit Tests (with coverage)
+        run: |
+          dotnet test MatchMaking.UnitTests/MatchMaking.UnitTests.csproj -c Release --no-build --verbosity normal \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults
+
+      - name: Wait for Kafka
+        run: |
+          echo "Waiting for Kafka to be ready..."
+          sleep 30
+          for i in $(seq 1 20); do
+            if python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(2); r=s.connect_ex(('127.0.0.1', 9092)); s.close(); exit(0 if r==0 else 1)"; then
+              echo "Kafka is up"
+              sleep 5
+              break
+            fi
+            echo "Attempt $i: waiting for Kafka..."
+            sleep 2
+          done
+
+      - name: Run Integration Tests
+        run: dotnet test MatchMaking.IntegrationTests/MatchMaking.IntegrationTests.csproj -c Release --no-build --verbosity normal
+        env:
+          ConnectionStrings__Redis: localhost:6379
+          Kafka__BootstrapServers: localhost:9092
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            **/TestResults/
+            **/*.trx
+            **/*.coverage
+          retention-days: 7
+
+      - name: Upload Coverage (if collected)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: "**/TestResults/**/coverage.*"
+          retention-days: 7
