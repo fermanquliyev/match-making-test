@@ -8,9 +8,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
-        services.AddScoped<IMatchSearchService, MatchSearchService>();
-        services.AddScoped<IMatchQueryService, MatchQueryService>();
-        services.AddScoped<IMatchCompletionHandler, MatchCompletionHandler>();
+        services.AddSingleton<IMatchSearchService, MatchSearchService>();
+        services.AddSingleton<IMatchQueryService, MatchQueryService>();
+        services.AddSingleton<IMatchCompletionHandler, MatchCompletionHandler>();
         return services;
     }
 }

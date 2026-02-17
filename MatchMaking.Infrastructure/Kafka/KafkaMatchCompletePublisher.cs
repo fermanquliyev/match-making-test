@@ -13,7 +13,7 @@ public sealed class KafkaMatchCompletePublisher(
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    public async Task PublishAsync(string matchId, IReadOnlyList<string> userIds, DateTime createdAtUtc, CancellationToken cancellationToken = default)
+    public async Task PublishAsync(string matchId, IReadOnlyList<string> userIds, DateTime createdAtUtc, CancellationToken cancellationToken)
     {
         var message = new MatchmakingComplete(matchId, userIds, createdAtUtc);
         var json = JsonSerializer.Serialize(message, JsonOptions);

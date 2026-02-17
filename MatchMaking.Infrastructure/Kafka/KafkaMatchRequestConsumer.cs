@@ -17,6 +17,7 @@ public sealed class KafkaMatchRequestConsumer(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await Task.Yield();
         try
         {
             while (!stoppingToken.IsCancellationRequested)

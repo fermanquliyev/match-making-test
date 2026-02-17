@@ -11,13 +11,13 @@ public sealed class RedisMatchQueueStore(
     private readonly IDatabase _db = redis.GetDatabase();
     private static readonly TimeSpan LockTimeout = TimeSpan.FromSeconds(10);
 
-    public async Task EnqueueAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task EnqueueAsync(string userId, CancellationToken cancellationToken)
     {
         var key = RedisKeyNames.Queue;
         await _db.ListRightPushAsync(key, userId);
     }
 
-    public async Task<IReadOnlyList<string>?> TryDequeueBatchAsync(int count, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<string>?> TryDequeueBatchAsync(int count, CancellationToken cancellationToken)
     {
         var lockKey = RedisKeyNames.QueueLock;
         var lockValue = Guid.NewGuid().ToString("N");
@@ -57,7 +57,7 @@ public sealed class RedisMatchQueueStore(
         }
     }
 
-    public async Task RequeueBatchAsync(IReadOnlyList<string> userIds, CancellationToken cancellationToken = default)
+    public async Task RequeueBatchAsync(IReadOnlyList<string> userIds, CancellationToken cancellationToken)
     {
         var key = RedisKeyNames.Queue;
         for (var i = userIds.Count - 1; i >= 0; i--)

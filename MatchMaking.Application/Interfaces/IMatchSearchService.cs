@@ -2,13 +2,12 @@ namespace MatchMaking.Application.Interfaces;
 
 public interface IMatchSearchService
 {
-    Task<MatchSearchResult> RequestMatchSearchAsync(string userId, CancellationToken cancellationToken = default);
+    Task<MatchSearchResult> RequestMatchSearchAsync(string userId, CancellationToken cancellationToken);
 }
 
 public enum MatchSearchStatus
 {
     Accepted,
-    RateLimited,
     AlreadyPending
 }
 

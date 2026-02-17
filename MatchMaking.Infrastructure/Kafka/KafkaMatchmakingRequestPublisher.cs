@@ -13,7 +13,7 @@ public sealed class KafkaMatchmakingRequestPublisher(
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    public async Task PublishAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task PublishAsync(string userId, CancellationToken cancellationToken)
     {
         var message = new MatchmakingRequest(userId, DateTime.UtcNow);
         var json = JsonSerializer.Serialize(message, JsonOptions);

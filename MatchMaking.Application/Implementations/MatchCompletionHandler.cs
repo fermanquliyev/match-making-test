@@ -11,7 +11,7 @@ public sealed class MatchCompletionHandler(
 {
     private static readonly TimeSpan MatchTtl = TimeSpan.FromMinutes(30);
 
-    public async Task HandleMatchCompleteAsync(string matchId, IReadOnlyList<string> userIds, DateTime createdAtUtc, CancellationToken cancellationToken = default)
+    public async Task HandleMatchCompleteAsync(string matchId, IReadOnlyList<string> userIds, DateTime createdAtUtc, CancellationToken cancellationToken)
     {
         var existing = await matchStore.GetMatchByMatchIdAsync(matchId, cancellationToken);
         if (existing is not null)

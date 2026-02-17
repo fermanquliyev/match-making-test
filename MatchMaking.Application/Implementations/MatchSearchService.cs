@@ -4,21 +4,12 @@ using Microsoft.Extensions.Logging;
 namespace MatchMaking.Application.Implementations;
 
 public sealed class MatchSearchService(
-    IRateLimitStore rateLimitStore,
     IPendingRequestStore pendingRequestStore,
     IMatchmakingRequestPublisher publisher,
     ILogger<MatchSearchService> logger) : IMatchSearchService
 {
-    private static readonly TimeSpan RateLimitWindow = TimeSpan.FromMilliseconds(100);
-
-    public async Task<MatchSearchResult> RequestMatchSearchAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<MatchSearchResult> RequestMatchSearchAsync(string userId, CancellationToken cancellationToken)
     {
-        if (!await rateLimitStore.TryAcquireAsync(userId, RateLimitWindow, cancellationToken))
-        {
-            logger.LogWarning("Rate limit exceeded for userId {UserId}", userId);
-            return new MatchSearchResult(MatchSearchStatus.RateLimited);
-        }
-
         if (await pendingRequestStore.IsPendingAsync(userId, cancellationToken))
         {
             logger.LogDebug("Duplicate match search request ignored for userId {UserId}", userId);

@@ -11,7 +11,7 @@ public sealed class RedisPendingRequestStore(
     private static readonly TimeSpan PendingTtl = TimeSpan.FromMinutes(5);
     private readonly IDatabase _db = redis.GetDatabase();
 
-    public async Task<bool> TrySetPendingAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<bool> TrySetPendingAsync(string userId, CancellationToken cancellationToken)
     {
         var key = RedisKeyNames.PendingRequest(userId);
         try
@@ -26,13 +26,13 @@ public sealed class RedisPendingRequestStore(
         }
     }
 
-    public async Task<bool> IsPendingAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<bool> IsPendingAsync(string userId, CancellationToken cancellationToken)
     {
         var key = RedisKeyNames.PendingRequest(userId);
         return await _db.KeyExistsAsync(key);
     }
 
-    public async Task ClearPendingAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task ClearPendingAsync(string userId, CancellationToken cancellationToken)
     {
         var key = RedisKeyNames.PendingRequest(userId);
         await _db.KeyDeleteAsync(key);

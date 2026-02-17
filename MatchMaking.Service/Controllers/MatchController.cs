@@ -10,12 +10,11 @@ public class MatchController(
     IMatchQueryService matchQueryService) : ControllerBase
 {
     /// <summary>
-    /// Request to search for a new match. Rate limit: 1 request per 100ms per userId.
+    /// Request to search for a new match.
     /// </summary>
     [HttpPost("search")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Search([FromQuery] string? userId, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(userId))
@@ -26,7 +25,6 @@ public class MatchController(
         return result.Status switch
         {
             MatchSearchStatus.Accepted => NoContent(),
-            MatchSearchStatus.RateLimited => StatusCode(429, new ProblemDetails { Title = "Too Many Requests", Status = 429 }),
             MatchSearchStatus.AlreadyPending => NoContent(),
             _ => NoContent()
         };

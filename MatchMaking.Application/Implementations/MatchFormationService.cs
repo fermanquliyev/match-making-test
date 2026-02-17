@@ -9,7 +9,7 @@ public sealed class MatchFormationService(
     int playersPerMatch,
     ILogger<MatchFormationService> logger) : IMatchFormationService
 {
-    public async Task TryFormMatchAsync(CancellationToken cancellationToken = default)
+    public async Task TryFormMatchAsync(CancellationToken cancellationToken)
     {
         var userIds = await queueStore.TryDequeueBatchAsync(playersPerMatch, cancellationToken);
         if (userIds is null || userIds.Count != playersPerMatch)

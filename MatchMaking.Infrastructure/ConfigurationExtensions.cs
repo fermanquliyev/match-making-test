@@ -20,7 +20,7 @@ public static class ConfigurationExtensions
     /// Kafka: Aspire may inject ConnectionStrings:kafka or Kafka:BootstrapServers; Docker uses Kafka__BootstrapServers.
     /// </summary>
     public static string GetKafkaBootstrapServers(this IConfiguration configuration) =>
-        configuration["Kafka:BootstrapServers"]
-        ?? configuration.GetConnectionString("kafka")
+        configuration.GetConnectionString("kafka")
+        ?? configuration["Kafka:BootstrapServers"]
         ?? "localhost:9092";
 }

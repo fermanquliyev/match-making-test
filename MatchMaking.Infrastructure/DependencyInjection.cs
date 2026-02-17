@@ -20,7 +20,6 @@ public static class DependencyInjection
         var redis = ConnectionMultiplexer.Connect(options);
         services.AddSingleton<IConnectionMultiplexer>(redis);
 
-        services.AddSingleton<IRateLimitStore, RedisRateLimitStore>();
         services.AddSingleton<IPendingRequestStore, RedisPendingRequestStore>();
         services.AddSingleton<IMatchStore, RedisMatchStore>();
         services.AddSingleton<IMatchQueueStore, RedisMatchQueueStore>();

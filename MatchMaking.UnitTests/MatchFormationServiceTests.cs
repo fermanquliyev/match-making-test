@@ -1,80 +1,82 @@
 using MatchMaking.Application.Implementations;
 using MatchMaking.Application.Interfaces;
+using Moq;
+using Moq.AutoMock;
 using Xunit;
 
 namespace MatchMaking.UnitTests;
 
 public class MatchFormationServiceTests
 {
+    private readonly AutoMocker _mocker = new();
+
+    private MatchFormationService CreateSut(int playersPerMatch = 3)
+    {
+        return new MatchFormationService(
+            _mocker.Get<IMatchQueueStore>(),
+            _mocker.Get<IMatchCompletePublisher>(),
+            playersPerMatch,
+            _mocker.Get<Microsoft.Extensions.Logging.ILogger<MatchFormationService>>());
+    }
+
     [Fact]
     public async Task TryFormMatchAsync_WhenQueueHasEnoughDistinctUsers_FormsMatchAndPublishes()
     {
         var userIds = new List<string> { "u1", "u2", "u3" };
-        var queue = new FakeQueueStore { DequeueResult = userIds };
-        var publisher = new FakeMatchCompletePublisher();
-        var logger = TestLogger<MatchFormationService>.Instance;
-        var sut = new MatchFormationService(queue, publisher, 3, logger);
+        _mocker.GetMock<IMatchQueueStore>()
+            .Setup(x => x.TryDequeueBatchAsync(3, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(userIds);
 
-        await sut.TryFormMatchAsync();
+        var sut = CreateSut();
 
-        Assert.Single(publisher.Published);
-        Assert.Equal(3, publisher.Published[0].UserIds.Count);
-        Assert.Equal("u1", publisher.Published[0].UserIds[0]);
-        Assert.Equal("u2", publisher.Published[0].UserIds[1]);
-        Assert.Equal("u3", publisher.Published[0].UserIds[2]);
+        await sut.TryFormMatchAsync(CancellationToken.None);
+
+        _mocker.GetMock<IMatchCompletePublisher>()
+            .Verify(x => x.PublishAsync(
+                It.IsAny<string>(),
+                It.Is<IReadOnlyList<string>>(ids => ids.Count == 3 && ids[0] == "u1" && ids[1] == "u2" && ids[2] == "u3"),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task TryFormMatchAsync_WhenQueueReturnsNull_DoesNotPublish()
     {
-        var queue = new FakeQueueStore { DequeueResult = null };
-        var publisher = new FakeMatchCompletePublisher();
-        var logger = TestLogger<MatchFormationService>.Instance;
-        var sut = new MatchFormationService(queue, publisher, 3, logger);
+        _mocker.GetMock<IMatchQueueStore>()
+            .Setup(x => x.TryDequeueBatchAsync(3, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<string>?)null);
 
-        await sut.TryFormMatchAsync();
+        var sut = CreateSut();
 
-        Assert.Empty(publisher.Published);
+        await sut.TryFormMatchAsync(CancellationToken.None);
+
+        _mocker.GetMock<IMatchCompletePublisher>()
+            .Verify(x => x.PublishAsync(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task TryFormMatchAsync_WhenBatchHasDuplicateUserIds_RequeuesAndDoesNotPublish()
     {
         var userIds = new List<string> { "u1", "u1", "u2" };
-        var queue = new FakeQueueStore { DequeueResult = userIds };
-        var publisher = new FakeMatchCompletePublisher();
-        var logger = TestLogger<MatchFormationService>.Instance;
-        var sut = new MatchFormationService(queue, publisher, 3, logger);
+        _mocker.GetMock<IMatchQueueStore>()
+            .Setup(x => x.TryDequeueBatchAsync(3, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(userIds);
 
-        await sut.TryFormMatchAsync();
+        var sut = CreateSut();
 
-        Assert.Single(queue.Requeued);
-        Assert.Equal(userIds, queue.Requeued[0]);
-        Assert.Empty(publisher.Published);
-    }
+        await sut.TryFormMatchAsync(CancellationToken.None);
 
-    private sealed class FakeQueueStore : IMatchQueueStore
-    {
-        public IReadOnlyList<string>? DequeueResult { get; set; }
-        public readonly List<IReadOnlyList<string>> Requeued = [];
-
-        public Task EnqueueAsync(string userId, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<IReadOnlyList<string>?> TryDequeueBatchAsync(int count, CancellationToken cancellationToken = default) => Task.FromResult(DequeueResult);
-        public Task RequeueBatchAsync(IReadOnlyList<string> userIds, CancellationToken cancellationToken = default)
-        {
-            Requeued.Add(userIds);
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class FakeMatchCompletePublisher : IMatchCompletePublisher
-    {
-        public readonly List<(string MatchId, IReadOnlyList<string> UserIds, DateTime CreatedAtUtc)> Published = [];
-
-        public Task PublishAsync(string matchId, IReadOnlyList<string> userIds, DateTime createdAtUtc, CancellationToken cancellationToken = default)
-        {
-            Published.Add((matchId, userIds, createdAtUtc));
-            return Task.CompletedTask;
-        }
+        _mocker.GetMock<IMatchQueueStore>()
+            .Verify(x => x.RequeueBatchAsync(userIds, It.IsAny<CancellationToken>()), Times.Once);
+        _mocker.GetMock<IMatchCompletePublisher>()
+            .Verify(x => x.PublishAsync(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()), Times.Never);
     }
 }
