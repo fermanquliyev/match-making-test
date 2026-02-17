@@ -1,8 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Confluent.Kafka;
 using MatchMaking.Application.Interfaces;
+using MatchMaking.Contracts;
 using MatchMaking.Domain;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -224,14 +227,77 @@ public sealed class MatchMakingFlowTests : IClassFixture<MatchMakingApplicationF
     }
 
     // ────────────────────────────────────────────
-    //  Health
+    //  Kafka Connectivity
     // ────────────────────────────────────────────
 
     [Fact]
-    public async Task Health_Returns200()
+    public async Task Health_ReportsKafkaAndRedisAsHealthy()
     {
         var response = await _client.GetAsync("/health");
+
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Equal("Healthy", body);
+    }
+
+    [Fact]
+    public async Task Search_PublishesMessageToKafkaRequestTopic()
+    {
+        var bootstrapServers = GetBootstrapServers();
+        using var consumer = new ConsumerBuilder<string, string>(new ConsumerConfig
+        {
+            BootstrapServers = bootstrapServers,
+            GroupId = $"test-{Guid.NewGuid():N}",
+            AutoOffsetReset = AutoOffsetReset.Earliest,
+            EnableAutoCommit = true
+        }).Build();
+        consumer.Subscribe("matchmaking.request");
+
+        var userId = UniqueUserId();
+        var searchResponse = await _client.PostAsync($"/api/Match/search?userId={userId}", null);
+        Assert.Equal(HttpStatusCode.NoContent, searchResponse.StatusCode);
+
+        var found = ConsumeUntil(consumer, msg => msg.Contains(userId), TimeSpan.FromSeconds(15));
+
+        Assert.NotNull(found);
+
+        var request = JsonSerializer.Deserialize<MatchmakingRequest>(found, JsonOptions);
+        Assert.NotNull(request);
+        Assert.Equal(userId, request.UserId);
+    }
+
+    [Fact]
+    public async Task KafkaConsumer_ProcessesMatchCompleteMessage_MatchBecomesAvailableViaApi()
+    {
+        var matchId = Guid.NewGuid().ToString();
+        var userIds = new[] { UniqueUserId(), UniqueUserId(), UniqueUserId() };
+        var message = new MatchmakingComplete(matchId, userIds, DateTime.UtcNow);
+        var json = JsonSerializer.Serialize(message, JsonOptions);
+
+        var producer = _factory.Services.GetRequiredService<IProducer<string, string>>();
+        await producer.ProduceAsync("matchmaking.complete",
+            new Message<string, string> { Key = matchId, Value = json });
+        producer.Flush(TimeSpan.FromSeconds(5));
+
+        var matchStore = _factory.Services.GetRequiredService<IMatchStore>();
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        Match? match = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            match = await matchStore.GetMatchByUserIdAsync(userIds[0], CancellationToken.None);
+            if (match is not null) break;
+            await Task.Delay(500);
+        }
+
+        Assert.NotNull(match);
+        Assert.Equal(matchId, match.MatchId);
+        Assert.Equal(3, match.UserIds.Count);
+
+        var response = await _client.GetAsync($"/api/Match?userId={userIds[0]}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<MatchInfoDto>(JsonOptions);
+        Assert.NotNull(body);
+        Assert.Equal(matchId, body.MatchId);
     }
 
     // ────────────────────────────────────────────
@@ -247,6 +313,29 @@ public sealed class MatchMakingFlowTests : IClassFixture<MatchMakingApplicationF
         await matchStore.SaveMatchAsync(match, TimeSpan.FromMinutes(5), CancellationToken.None);
         foreach (var uid in userIds)
             await matchStore.SetUserMatchAsync(uid, matchId, TimeSpan.FromMinutes(5), CancellationToken.None);
+    }
+
+    private string GetBootstrapServers()
+    {
+        var config = _factory.Services.GetRequiredService<IConfiguration>();
+        return config.GetConnectionString("kafka")
+            ?? config["Kafka:BootstrapServers"]
+            ?? "localhost:9092";
+    }
+
+    private static string? ConsumeUntil(
+        IConsumer<string, string> consumer,
+        Func<string, bool> predicate,
+        TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var result = consumer.Consume(TimeSpan.FromSeconds(1));
+            if (result?.Message?.Value is not null && predicate(result.Message.Value))
+                return result.Message.Value;
+        }
+        return null;
     }
 
     private sealed record MatchInfoDto(string MatchId, List<string> UserIds);

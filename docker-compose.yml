@@ -16,8 +16,10 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     ports:
@@ -44,8 +46,8 @@ services:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command: |
-      "kafka-topics --create --if-not-exists --topic matchmaking.request --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 && \
-       kafka-topics --create --if-not-exists --topic matchmaking.complete --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1"
+      "kafka-topics --create --if-not-exists --topic matchmaking.request --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1 && \
+       kafka-topics --create --if-not-exists --topic matchmaking.complete --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1"
     restart: "no"
 
   matchmaking-service:
@@ -62,7 +64,7 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__Redis: redis:6379
-      Kafka__BootstrapServers: kafka:9092
+      Kafka__BootstrapServers: kafka:29092
     ports:
       - "8080:8080"
     healthcheck:
@@ -85,7 +87,7 @@ services:
         condition: service_completed_successfully
     environment:
       ConnectionStrings__Redis: redis:6379
-      Kafka__BootstrapServers: kafka:9092
+      Kafka__BootstrapServers: kafka:29092
       MatchMaking__PlayersPerMatch: 3
     deploy:
       replicas: 2
