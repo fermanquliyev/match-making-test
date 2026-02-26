@@ -1,0 +1,11 @@
+@MatchMaking.Service_HostAddress = http://localhost:5107
+
+### Search for a match
+POST {{MatchMaking.Service_HostAddress}}/api/Match/search?userId=test-user-1
+
+### Get match result
+GET {{MatchMaking.Service_HostAddress}}/api/Match?userId=test-user-1
+Accept: application/json
+
+### Health check
+GET {{MatchMaking.Service_HostAddress}}/health

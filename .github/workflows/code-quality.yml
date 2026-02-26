@@ -1,0 +1,90 @@
+# Code Quality – Format, analyzers, SonarCloud, Trivy (PR and push to main)
+name: Code Quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  format-and-analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Install dotnet format
+        run: dotnet tool install -g dotnet-format
+
+      - name: Check formatting
+        run: dotnet format MatchMaking.slnx --verify-no-changes
+
+      - name: Restore
+        run: dotnet restore MatchMaking.slnx
+
+      - name: Build (warnings as errors)
+        run: dotnet build MatchMaking.slnx --no-restore -c Release
+
+  sonarcloud:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Restore
+        run: dotnet restore MatchMaking.slnx
+
+      - name: Build
+        run: dotnet build MatchMaking.slnx --no-restore -c Release
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        continue-on-error: true
+
+  trivy-fs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          severity: "CRITICAL,HIGH"
+          exit-code: "1"
+        continue-on-error: true
+
+  trivy-dockerfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy on Dockerfiles
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "config"
+          scan-ref: "."
+          severity: "CRITICAL,HIGH"
+          exit-code: "0"
+        continue-on-error: true

@@ -1,0 +1,93 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      "kafka-topics --create --if-not-exists --topic matchmaking.request --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1 && \
+       kafka-topics --create --if-not-exists --topic matchmaking.complete --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1"
+    restart: "no"
+
+  matchmaking-service:
+    build:
+      context: .
+      dockerfile: MatchMaking.Service/Dockerfile
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Redis: redis:6379
+      Kafka__BootstrapServers: kafka:29092
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  matchmaking-worker:
+    build:
+      context: .
+      dockerfile: MatchMaking.Worker/Dockerfile
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      ConnectionStrings__Redis: redis:6379
+      Kafka__BootstrapServers: kafka:29092
+      MatchMaking__PlayersPerMatch: 3
+    deploy:
+      replicas: 2
