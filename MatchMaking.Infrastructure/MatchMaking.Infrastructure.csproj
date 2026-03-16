@@ -9,14 +9,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Confluent.Kafka" Version="2.6.1" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
-    <PackageReference Include="StackExchange.Redis" Version="2.8.16" />
+    <PackageReference Include="Confluent.Kafka" Version="2.13.2" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.14" />
+    <PackageReference Include="StackExchange.Redis" Version="2.12.1" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.14" />
     <ProjectReference Include="..\MatchMaking.Application\MatchMaking.Application.csproj" />
     <ProjectReference Include="..\MatchMaking.Contracts\MatchMaking.Contracts.csproj" />
     <ProjectReference Include="..\MatchMaking.Domain\MatchMaking.Domain.csproj" />
